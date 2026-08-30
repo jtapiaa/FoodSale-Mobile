@@ -170,28 +170,60 @@ def get_orders():
     for order in orders:
         restaurant = Restaurant.query.get(order.restaurant_id)
 
-        result.append({
-            "id": order.id,
-            "restaurant_id": order.restaurant_id,
-            "restaurant_name": restaurant.name if restaurant else "Restaurante",
-            "subtotal": order.subtotal,
-            "delivery": order.delivery,
-            "total": order.total,
-            "status": order.status,
-            "created_at": order.created_at.isoformat(),
-            "items": [
-                {
-                    "product_id": item.product_id,
-                    "product_name": (
-                        Product.query.get(item.product_id).name
-                        if Product.query.get(item.product_id)
-                        else "Producto"
-                    ),
-                    "quantity": item.quantity,
-                    "price": item.price,
-                }
-                for item in order.items
-            ],
-        })
+        result.append(
+            {
+                "id": order.id,
+                "restaurant_id": order.restaurant_id,
+                "restaurant_name": restaurant.name if restaurant else "Restaurante",
+                "subtotal": order.subtotal,
+                "delivery": order.delivery,
+                "total": order.total,
+                "status": order.status,
+                "created_at": order.created_at.isoformat(),
+                "items": [
+                    {
+                        "product_id": item.product_id,
+                        "product_name": (
+                            Product.query.get(item.product_id).name
+                            if Product.query.get(item.product_id)
+                            else "Producto"
+                        ),
+                        "quantity": item.quantity,
+                        "price": item.price,
+                    }
+                    for item in order.items
+                ],
+            }
+        )
+
+    return jsonify(result)
+
+
+@main.route("/api/search", methods=["GET"])
+def search():
+    query = request.args.get("q", "").strip()
+
+    if not query:
+        return jsonify([])
+
+    products = Product.query.filter(Product.name.ilike(f"%{query}%")).all()
+
+    result = []
+
+    for product in products:
+        restaurant = Restaurant.query.get(product.restaurant_id)
+
+        result.append(
+            {
+                "id": product.id,
+                "name": product.name,
+                "description": product.description,
+                "price": product.price,
+                "image": product.image,
+                "available": product.available,
+                "restaurant_id": product.restaurant_id,
+                "restaurant_name": (restaurant.name if restaurant else "Restaurante"),
+            }
+        )
 
     return jsonify(result)

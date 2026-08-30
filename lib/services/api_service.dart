@@ -78,8 +78,15 @@ class ApiService {
     throw Exception('Error al obtener categorías: ${response.statusCode}');
   }
 
+  static Future<List<dynamic>> search(String query) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/search?q=${Uri.encodeQueryComponent(query)}'),
+    );
 
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
 
-
-  
+    throw Exception('Error al buscar: ${response.statusCode}');
+  }
 }

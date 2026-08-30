@@ -35,6 +35,21 @@ const orange = Color(0xFFFFB000);
 const dark = Color(0xFF202124);
 const green = Color(0xFF4CAF50);
 
+String getOrderStatusText(String status) {
+  switch (status) {
+    case 'pending':
+      return 'Pendiente';
+    case 'preparing':
+      return 'Preparando';
+    case 'on_the_way':
+      return 'En camino';
+    case 'delivered':
+      return 'Entregado';
+    default:
+      return status;
+  }
+}
+
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
 
@@ -99,6 +114,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late Future<List<dynamic>> restaurants;
+  String searchQuery = '';
+  List<dynamic> searchResults = [];
 
   @override
   void initState() {
@@ -170,7 +187,34 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            sliver: SliverToBoxAdapter(child: _SearchBar()),
+            sliver: SliverToBoxAdapter(
+              child: _SearchBar(
+                onChanged: (value) async {
+                  setState(() {
+                    searchQuery = value;
+                  });
+
+                  if (value.trim().isEmpty) {
+                    setState(() {
+                      searchResults = [];
+                    });
+                    return;
+                  }
+
+                  try {
+                    final results = await ApiService.search(value.trim());
+
+                    if (!mounted) return;
+
+                    setState(() {
+                      searchResults = results;
+                    });
+                  } catch (e) {
+                    print('ERROR BUSCANDO: $e');
+                  }
+                },
+              ),
+            ),
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
@@ -222,45 +266,141 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
 
                 final data = snapshot.data ?? [];
+                final filteredData = data.where((restaurant) {
+                  final name =
+                      restaurant['name']?.toString().toLowerCase() ?? '';
+                  final category =
+                      restaurant['category']?.toString().toLowerCase() ?? '';
+
+                  return name.contains(searchQuery.toLowerCase()) ||
+                      category.contains(searchQuery.toLowerCase());
+                }).toList();
+
+                final isSearching = searchQuery.trim().isNotEmpty;
 
                 if (data.isEmpty) {
                   return const Center(
                     child: Text('No hay restaurantes disponibles'),
                   );
                 }
+
                 print('RESTAURANTES RECIBIDOS: ${data.length}');
                 print('PRIMER RESTAURANTE: ${data[0]}');
 
                 return Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
                   child: Column(
-                    children: data.map((restaurant) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: RestaurantCard(
-                          name: restaurant['name']?.toString() ?? '',
-                          rating: restaurant['rating']?.toString() ?? '0.0',
-                          time: restaurant['delivery_time']?.toString() ?? '',
-                          category: restaurant['category']?.toString() ?? '',
-                          icon: Icons.lunch_dining,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => RestaurantScreen(
-                                  restaurantId: restaurant['id'],
-                                  restaurantName: restaurant['name'],
-                                  rating: restaurant['rating'].toString(),
-                                  deliveryTime:
-                                      restaurant['delivery_time'] ?? '',
-                                  category: restaurant['category'] ?? '',
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (isSearching && searchResults.isNotEmpty) ...[
+                        const Text(
+                          'Platos encontrados',
+                          style: TextStyle(
+                            fontSize: 21,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        ...searchResults.map((product) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: 4,
+                                    bottom: 6,
+                                  ),
+                                  child: Text(
+                                    product['restaurant_name'] ?? 'Restaurante',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                MenuItem(
+                                  productId: product['id'],
+                                  name: product['name'],
+                                  description: product['description'] ?? '',
+                                  price: product['price'],
+                                  restaurantId: product['restaurant_id'],
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+
+                      if (!isSearching) ...[
+                        ...filteredData.map((restaurant) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: RestaurantCard(
+                              name: restaurant['name']?.toString() ?? '',
+                              rating: restaurant['rating']?.toString() ?? '0.0',
+                              time:
+                                  restaurant['delivery_time']?.toString() ?? '',
+                              category:
+                                  restaurant['category']?.toString() ?? '',
+                              icon: Icons.lunch_dining,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => RestaurantScreen(
+                                    restaurantId: restaurant['id'],
+                                    restaurantName: restaurant['name'],
+                                    rating: restaurant['rating'].toString(),
+                                    deliveryTime:
+                                        restaurant['delivery_time']
+                                            ?.toString() ??
+                                        '',
+                                    category:
+                                        restaurant['category']?.toString() ??
+                                        '',
+                                  ),
                                 ),
                               ),
-                            );
-                          },
+                            ),
+                          );
+                        }),
+                      ],
+
+                      if (isSearching && searchResults.isEmpty) ...[
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 40),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.search_off,
+                                  size: 50,
+                                  color: Colors.grey,
+                                ),
+                                SizedBox(height: 12),
+                                Text(
+                                  'No encontramos resultados',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                SizedBox(height: 5),
+                                Text(
+                                  'Prueba con otro nombre o plato',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      );
-                    }).toList(),
+                      ],
+                    ],
                   ),
                 );
               },
@@ -301,6 +441,10 @@ class _LocationCard extends StatelessWidget {
 }
 
 class _SearchBar extends StatelessWidget {
+  final ValueChanged<String> onChanged;
+
+  const _SearchBar({required this.onChanged});
+
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -310,19 +454,20 @@ class _SearchBar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             height: 56,
             decoration: _cardDecoration(),
-            child: const Row(
-              children: [
-                Icon(Icons.search, color: Colors.grey),
-                SizedBox(width: 10),
-                Text(
-                  'Buscar platos, restaurantes...',
-                  style: TextStyle(color: Colors.grey, fontSize: 15),
-                ),
-              ],
+            child: TextField(
+              onChanged: onChanged,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                icon: Icon(Icons.search, color: Colors.grey),
+                hintText: 'Buscar platos, restaurantes...',
+                hintStyle: TextStyle(color: Colors.grey, fontSize: 15),
+              ),
             ),
           ),
         ),
+
         const SizedBox(width: 10),
+
         Container(
           width: 56,
           height: 56,
@@ -1215,6 +1360,95 @@ class _InfoTile extends StatelessWidget {
   }
 }
 
+class OrderDetailScreen extends StatelessWidget {
+  final Map<String, dynamic> order;
+
+  const OrderDetailScreen({super.key, required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Pedido #${order['id']}',
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(
+            order['restaurant_name'] ?? 'Restaurante',
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+          ),
+
+          const SizedBox(height: 20),
+
+          const Text(
+            'Productos',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+
+          const SizedBox(height: 10),
+
+          ...((order['items'] ?? []) as List).map((item) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${item['quantity']} × ${item['product_name']}',
+                    ),
+                  ),
+                  Text(
+                    '\$${item['price'] * item['quantity']}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          const Divider(height: 30),
+
+          Text('Subtotal: \$${order['subtotal']}'),
+          Text('Despacho: \$${order['delivery']}'),
+
+          const SizedBox(height: 6),
+
+          Text(
+            'Total: \$${order['total']}',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+          ),
+
+          const SizedBox(height: 24),
+
+          SizedBox(
+            height: 52,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TrackingScreen(order: order),
+                  ),
+                );
+              },
+              child: const Text(
+                'Ver seguimiento',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class TrackingScreen extends StatelessWidget {
   final Map<String, dynamic> order;
 
@@ -1222,21 +1456,6 @@ class TrackingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String statusText(String status) {
-      switch (status) {
-        case 'pending':
-          return 'Pendiente';
-        case 'preparing':
-          return 'Preparando';
-        case 'on_the_way':
-          return 'En camino';
-        case 'delivered':
-          return 'Entregado';
-        default:
-          return status;
-      }
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rastrea tu pedido'),
@@ -1266,7 +1485,7 @@ class TrackingScreen extends StatelessWidget {
                 ),
                 SizedBox(height: 5),
                 Text(
-                  'Estado: ${statusText(order['status'])}',
+                  'Estado: ${getOrderStatusText(order['status'])}',
                   style: const TextStyle(
                     color: green,
                     fontWeight: FontWeight.w700,
@@ -1293,7 +1512,7 @@ class TrackingScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _InfoTile(icon: Icons.person, text: 'Carlos R. · Tu repartidor'),
+          _InfoTile(icon: Icons.person, text: 'Repartidor aún no asignado'),
         ],
       ),
     );
@@ -1536,69 +1755,80 @@ class _OrdersScreenState extends State<OrdersScreen> {
             itemBuilder: (context, index) {
               final order = data[index];
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 14),
-                padding: const EdgeInsets.all(18),
-                decoration: _cardDecoration(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Pedido #${order['id']}',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
+              return InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => OrderDetailScreen(order: order),
                     ),
-
-                    const SizedBox(height: 6),
-
-                    Text(
-                      order['restaurant_name'] ?? 'Restaurante',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    ...((order['items'] ?? []) as List).map((item) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 5),
-                        child: Text(
-                          '${item['quantity']} × ${item['product_name']}',
-                          style: const TextStyle(fontSize: 14),
+                  );
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(18),
+                  decoration: _cardDecoration(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Pedido #${order['id']}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
                         ),
-                      );
-                    }),
-
-                    const SizedBox(height: 8),
-
-                    Text(
-                      'Estado: ${order['status']}',
-                      style: const TextStyle(
-                        color: orange,
-                        fontWeight: FontWeight.w700,
                       ),
-                    ),
 
-                    const Divider(height: 20),
+                      const SizedBox(height: 6),
 
-                    Text('Subtotal: \$${order['subtotal']}'),
-
-                    Text('Despacho: \$${order['delivery']}'),
-
-                    const SizedBox(height: 4),
-
-                    Text(
-                      'Total: \$${order['total']}',
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
+                      Text(
+                        order['restaurant_name'] ?? 'Restaurante',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                  ],
+
+                      const SizedBox(height: 12),
+
+                      ...((order['items'] ?? []) as List).map((item) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 5),
+                          child: Text(
+                            '${item['quantity']} × ${item['product_name']}',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        );
+                      }),
+
+                      const SizedBox(height: 8),
+
+                      Text(
+                        'Estado: ${getOrderStatusText(order['status'])}',
+                        style: const TextStyle(
+                          color: orange,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+
+                      const Divider(height: 20),
+
+                      Text('Subtotal: \$${order['subtotal']}'),
+
+                      Text('Despacho: \$${order['delivery']}'),
+
+                      const SizedBox(height: 4),
+
+                      Text(
+                        'Total: \$${order['total']}',
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
