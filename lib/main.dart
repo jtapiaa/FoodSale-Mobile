@@ -4,8 +4,11 @@ import 'models/cart_item.dart';
 
 import 'services/api_service.dart';
 import 'services/cart_service.dart';
+import 'services/favorite_service.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await FavoriteService.load();
   runApp(const FoodSaleApp());
 }
 
@@ -60,21 +63,26 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int index = 0;
 
-  final pages = const [
-    HomeScreen(),
-    ExploreScreen(),
-    OrdersScreen(),
-    FavoritesScreen(),
-    ProfileScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: pages[index],
+      body: IndexedStack(
+        index: index,
+        children: [
+          const HomeScreen(),
+          const ExploreScreen(),
+          const OrdersScreen(),
+          const FavoritesScreen(),
+          const ProfileScreen(),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
-        onDestinationSelected: (value) => setState(() => index = value),
+        onDestinationSelected: (value) {
+          setState(() {
+            index = value;
+          });
+        },
         backgroundColor: Colors.white,
         indicatorColor: const Color(0xFFFFF0C7),
         destinations: const [
@@ -308,17 +316,48 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                    left: 4,
-                                    bottom: 6,
-                                  ),
-                                  child: Text(
-                                    product['restaurant_name'] ?? 'Restaurante',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey,
-                                      fontWeight: FontWeight.w600,
+                                InkWell(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => RestaurantScreen(
+                                          restaurantId:
+                                              product['restaurant_id'],
+                                          restaurantName:
+                                              product['restaurant_name'] ??
+                                              'Restaurante',
+                                          rating:
+                                              product['restaurant_rating']
+                                                  ?.toString() ??
+                                              '0.0',
+                                          deliveryTime:
+                                              product['restaurant_delivery_time']
+                                                  ?.toString() ??
+                                              '',
+                                          category:
+                                              product['restaurant_category']
+                                                  ?.toString() ??
+                                              '',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: 4,
+                                      bottom: 6,
+                                    ),
+                                    child: Text(
+                                      '${product['restaurant_name'] ?? 'Restaurante'}'
+                                      '  ·  ★ ${product['restaurant_rating'] ?? '0.0'}'
+                                      '  ·  ${product['restaurant_delivery_time'] ?? ''}',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -340,6 +379,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: RestaurantCard(
+                              restaurantId: restaurant['id'],
                               name: restaurant['name']?.toString() ?? '',
                               rating: restaurant['rating']?.toString() ?? '0.0',
                               time:
@@ -679,7 +719,8 @@ class _CategoriesState extends State<_Categories> {
   }
 }
 
-class RestaurantCard extends StatelessWidget {
+class RestaurantCard extends StatefulWidget {
+  final int restaurantId;
   final String name;
   final String rating;
   final String time;
@@ -689,6 +730,7 @@ class RestaurantCard extends StatelessWidget {
 
   const RestaurantCard({
     super.key,
+    required this.restaurantId,
     required this.name,
     required this.rating,
     required this.time,
@@ -698,10 +740,33 @@ class RestaurantCard extends StatelessWidget {
   });
 
   @override
+  State<RestaurantCard> createState() => _RestaurantCardState();
+}
+
+class _RestaurantCardState extends State<RestaurantCard> {
+  @override
+  void initState() {
+    super.initState();
+    FavoriteService.changes.addListener(_favoriteChanged);
+  }
+
+  void _favoriteChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    FavoriteService.changes.removeListener(_favoriteChanged);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(20),
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         decoration: _cardDecoration(),
         clipBehavior: Clip.antiAlias,
@@ -712,7 +777,11 @@ class RestaurantCard extends StatelessWidget {
               width: 100,
               height: 125,
               color: const Color(0xFFFFE7B0),
-              child: Icon(icon, size: 56, color: const Color(0xFF8B5A2B)),
+              child: Icon(
+                widget.icon,
+                size: 56,
+                color: const Color(0xFF8B5A2B),
+              ),
             ),
 
             Expanded(
@@ -722,7 +791,7 @@ class RestaurantCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      name,
+                      widget.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -734,7 +803,7 @@ class RestaurantCard extends StatelessWidget {
                     const SizedBox(height: 6),
 
                     Text(
-                      '★ $rating  ·  $time',
+                      '★ ${widget.rating}  ·  ${widget.time}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w600),
@@ -743,7 +812,7 @@ class RestaurantCard extends StatelessWidget {
                     const SizedBox(height: 6),
 
                     Text(
-                      category,
+                      widget.category,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Colors.grey),
@@ -773,9 +842,25 @@ class RestaurantCard extends StatelessWidget {
               ),
             ),
 
-            const Padding(
-              padding: EdgeInsets.only(right: 12, top: 14),
-              child: Icon(Icons.favorite_border),
+            Padding(
+              padding: const EdgeInsets.only(right: 4, top: 6),
+              child: IconButton(
+                onPressed: () async {
+                  await FavoriteService.toggle(widget.restaurantId);
+
+                  if (!mounted) return;
+
+                  setState(() {});
+                },
+                icon: Icon(
+                  FavoriteService.isFavorite(widget.restaurantId)
+                      ? Icons.favorite
+                      : Icons.favorite_border,
+                  color: FavoriteService.isFavorite(widget.restaurantId)
+                      ? Colors.red
+                      : dark,
+                ),
+              ),
             ),
           ],
         ),
@@ -1839,20 +1924,130 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 }
 
-class FavoritesScreen extends StatelessWidget {
+class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
 
   @override
+  State<FavoritesScreen> createState() => _FavoritesScreenState();
+}
+
+class _FavoritesScreenState extends State<FavoritesScreen> {
+  late Future<List<dynamic>> restaurants;
+
+  @override
+  void initState() {
+    super.initState();
+    restaurants = ApiService.getRestaurants();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Text(
-            'Favoritos',
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+    return ValueListenableBuilder<int>(
+      valueListenable: FavoriteService.changes,
+      builder: (context, _, child) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text(
+              'Favoritos',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
           ),
-        ),
-      ),
+          body: FutureBuilder<List<dynamic>>(
+            future: restaurants,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text(
+                    'Error al cargar favoritos:\n${snapshot.error}',
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }
+
+              final data = snapshot.data ?? [];
+
+              final favorites = data.where((restaurant) {
+                return FavoriteService.isFavorite(restaurant['id']);
+              }).toList();
+
+              if (favorites.isEmpty) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(30),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.favorite_border,
+                          size: 60,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'No tienes favoritos',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        SizedBox(height: 6),
+                        Text(
+                          'Agrega restaurantes a tus favoritos '
+                          'para encontrarlos rápidamente.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(20),
+                itemCount: favorites.length,
+                itemBuilder: (context, index) {
+                  final restaurant = favorites[index];
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: RestaurantCard(
+                      restaurantId: restaurant['id'],
+                      name: restaurant['name']?.toString() ?? '',
+                      rating: restaurant['rating']?.toString() ?? '0.0',
+                      time: restaurant['delivery_time']?.toString() ?? '',
+                      category: restaurant['category']?.toString() ?? '',
+                      icon: Icons.lunch_dining,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => RestaurantScreen(
+                              restaurantId: restaurant['id'],
+                              restaurantName: restaurant['name'],
+                              rating: restaurant['rating'].toString(),
+                              deliveryTime:
+                                  restaurant['delivery_time']?.toString() ?? '',
+                              category:
+                                  restaurant['category']?.toString() ?? '',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

@@ -223,6 +223,11 @@ def search():
                 "available": product.available,
                 "restaurant_id": product.restaurant_id,
                 "restaurant_name": (restaurant.name if restaurant else "Restaurante"),
+                "restaurant_rating": (restaurant.rating if restaurant else 0.0),
+                "restaurant_delivery_time": (
+                    restaurant.delivery_time if restaurant else ""
+                ),
+                "restaurant_category": (restaurant.category if restaurant else ""),
             }
         )
 
