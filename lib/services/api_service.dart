@@ -3,18 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  //static const String baseUrl = 'http://127.0.0.1:5000/api';
   static const String baseUrl = 'http://192.168.1.220:5001/api';
-
-  static Future<List<dynamic>> getRestaurants() async {
-    final response = await http.get(Uri.parse('$baseUrl/restaurants'));
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-
-    throw Exception('Error al obtener restaurantes: ${response.statusCode}');
-  }
 
   static Future<List<dynamic>> getRestaurants() async {
     final url = Uri.parse('$baseUrl/restaurants');
@@ -31,6 +20,18 @@ class ApiService {
     }
 
     throw Exception('Error al obtener restaurantes: ${response.statusCode}');
+  }
+
+  static Future<List<dynamic>> getRestaurantProducts(int restaurantId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/restaurants/$restaurantId/products'),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+
+    throw Exception('Error al obtener productos: ${response.statusCode}');
   }
 
   static Future<Map<String, dynamic>> createOrder({
@@ -56,4 +57,29 @@ class ApiService {
       'Error al crear pedido: ${response.statusCode} ${response.body}',
     );
   }
+
+  static Future<List<dynamic>> getOrders() async {
+    final response = await http.get(Uri.parse('$baseUrl/orders'));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+
+    throw Exception('Error al obtener pedidos: ${response.statusCode}');
+  }
+
+  static Future<List<dynamic>> getCategories() async {
+    final response = await http.get(Uri.parse('$baseUrl/categories'));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+
+    throw Exception('Error al obtener categorías: ${response.statusCode}');
+  }
+
+
+
+
+  
 }

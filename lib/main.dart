@@ -228,29 +228,40 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Text('No hay restaurantes disponibles'),
                   );
                 }
+                print('RESTAURANTES RECIBIDOS: ${data.length}');
+                print('PRIMER RESTAURANTE: ${data[0]}');
 
-                return Column(
-                  children: data.map((restaurant) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: RestaurantCard(
-                        name: restaurant['name'],
-                        rating: restaurant['rating'].toString(),
-                        time: restaurant['delivery_time'] ?? '',
-                        category: restaurant['category'] ?? '',
-                        icon: Icons.lunch_dining,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => RestaurantScreen(
-                              restaurantId: restaurant['id'],
-                              restaurantName: restaurant['name'],
-                            ),
-                          ),
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                  child: Column(
+                    children: data.map((restaurant) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: RestaurantCard(
+                          name: restaurant['name']?.toString() ?? '',
+                          rating: restaurant['rating']?.toString() ?? '0.0',
+                          time: restaurant['delivery_time']?.toString() ?? '',
+                          category: restaurant['category']?.toString() ?? '',
+                          icon: Icons.lunch_dining,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => RestaurantScreen(
+                                  restaurantId: restaurant['id'],
+                                  restaurantName: restaurant['name'],
+                                  rating: restaurant['rating'].toString(),
+                                  deliveryTime:
+                                      restaurant['delivery_time'] ?? '',
+                                  category: restaurant['category'] ?? '',
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                      ),
-                    );
-                  }).toList(),
+                      );
+                    }).toList(),
+                  ),
                 );
               },
             ),
@@ -419,50 +430,106 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _Categories extends StatelessWidget {
+class _Categories extends StatefulWidget {
+  const _Categories();
+
+  @override
+  State<_Categories> createState() => _CategoriesState();
+}
+
+class _CategoriesState extends State<_Categories> {
+  late Future<List<dynamic>> categories;
+
+  @override
+  void initState() {
+    super.initState();
+    categories = ApiService.getCategories();
+  }
+
+  IconData getCategoryIcon(String name) {
+    switch (name.toLowerCase()) {
+      case 'hamburguesas':
+        return Icons.lunch_dining;
+      case 'pizzas':
+        return Icons.local_pizza;
+      case 'saludable':
+        return Icons.eco;
+      case 'bebidas':
+        return Icons.local_drink;
+      case 'postres':
+        return Icons.cake;
+      default:
+        return Icons.restaurant;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final items = [
-      ('Hamburguesas', Icons.lunch_dining),
-      ('Pizzas', Icons.local_pizza),
-      ('Saludable', Icons.eco),
-      ('Bebidas', Icons.local_drink),
-      ('Postres', Icons.cake),
-      ('Más', Icons.more_horiz),
-    ];
-
-    return SizedBox(
-      height: 105,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (_, i) {
-          return SizedBox(
-            width: 82,
-            child: Column(
-              children: [
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: _cardDecoration(),
-                  child: Icon(
-                    items[i].$2,
-                    color: i == 0 ? orange : dark,
-                    size: 30,
-                  ),
-                ),
-                const SizedBox(height: 7),
-                Text(
-                  items[i].$1,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ],
-            ),
+    return FutureBuilder<List<dynamic>>(
+      future: categories,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 105,
+            child: Center(child: CircularProgressIndicator()),
           );
-        },
-      ),
+        }
+
+        if (snapshot.hasError) {
+          return const SizedBox(
+            height: 105,
+            child: Center(child: Text('Error al cargar categorías')),
+          );
+        }
+
+        final items = snapshot.data ?? [];
+
+        if (items.isEmpty) {
+          return const SizedBox(
+            height: 105,
+            child: Center(child: Text('No hay categorías')),
+          );
+        }
+
+        return SizedBox(
+          height: 105,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, i) {
+              final category = items[i];
+              final name = category['name']?.toString() ?? '';
+
+              return SizedBox(
+                width: 82,
+                child: Column(
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: _cardDecoration(),
+                      child: Icon(
+                        getCategoryIcon(name),
+                        color: i == 0 ? orange : dark,
+                        size: 30,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      name,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -494,13 +561,15 @@ class RestaurantCard extends StatelessWidget {
         decoration: _cardDecoration(),
         clipBehavior: Clip.antiAlias,
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 120,
+              width: 100,
               height: 125,
               color: const Color(0xFFFFE7B0),
-              child: Icon(icon, size: 64, color: const Color(0xFF8B5A2B)),
+              child: Icon(icon, size: 56, color: const Color(0xFF8B5A2B)),
             ),
+
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(14),
@@ -509,19 +578,34 @@ class RestaurantCard extends StatelessWidget {
                   children: [
                     Text(
                       name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+
                     const SizedBox(height: 6),
+
                     Text(
-                      '★ $rating  ·  $time  ·  \$',
+                      '★ $rating  ·  $time',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
+
                     const SizedBox(height: 6),
-                    Text(category, style: const TextStyle(color: Colors.grey)),
+
+                    Text(
+                      category,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+
                     const SizedBox(height: 10),
+
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -543,8 +627,9 @@ class RestaurantCard extends StatelessWidget {
                 ),
               ),
             ),
+
             const Padding(
-              padding: EdgeInsets.only(right: 12),
+              padding: EdgeInsets.only(right: 12, top: 14),
               child: Icon(Icons.favorite_border),
             ),
           ],
@@ -554,15 +639,20 @@ class RestaurantCard extends StatelessWidget {
   }
 }
 
-//**   */
 class RestaurantScreen extends StatefulWidget {
   final int restaurantId;
   final String restaurantName;
+  final String rating;
+  final String deliveryTime;
+  final String category;
 
   const RestaurantScreen({
     super.key,
     required this.restaurantId,
     required this.restaurantName,
+    required this.rating,
+    required this.deliveryTime,
+    required this.category,
   });
 
   @override
@@ -583,9 +673,9 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Burger House',
-          style: TextStyle(fontWeight: FontWeight.w800),
+        title: Text(
+          widget.restaurantName,
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
@@ -606,20 +696,17 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
             ),
           ),
           const SizedBox(height: 18),
-          const Text(
-            'Burger House',
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+          Text(
+            widget.restaurantName,
+            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 6),
-          const Text(
-            '★ 4.6  ·  30–40 min  ·  \$',
+          Text(
+            '★ ${widget.rating}  ·  ${widget.deliveryTime}  ·  \$',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Hamburguesas · Americana',
-            style: TextStyle(color: Colors.grey),
-          ),
+          Text(widget.category, style: const TextStyle(color: Colors.grey)),
           const SizedBox(height: 24),
           const Text(
             'Menú',
@@ -666,6 +753,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
                     name: product['name'],
                     description: product['description'] ?? '',
                     price: product['price'],
+                    restaurantId: widget.restaurantId,
                   );
                 }).toList(),
               );
@@ -682,6 +770,7 @@ class MenuItem extends StatelessWidget {
   final String name;
   final String description;
   final int price;
+  final int restaurantId;
 
   const MenuItem({
     super.key,
@@ -689,6 +778,7 @@ class MenuItem extends StatelessWidget {
     required this.name,
     required this.description,
     required this.price,
+    required this.restaurantId,
   });
 
   @override
@@ -731,6 +821,7 @@ class MenuItem extends StatelessWidget {
           ),
           IconButton(
             onPressed: () {
+              CartService.restaurantId = restaurantId;
               CartService.addItem(
                 productId: productId,
                 name: name,
@@ -1033,10 +1124,53 @@ class PaymentScreen extends StatelessWidget {
           SizedBox(
             height: 54,
             child: FilledButton(
-              onPressed: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const TrackingScreen()),
-              ),
+              onPressed: () async {
+                try {
+                  final restaurantId = CartService.restaurantId;
+
+                  if (restaurantId == null) {
+                    throw Exception('No se encontró el restaurante del pedido');
+                  }
+
+                  final items = CartService.items.map((item) {
+                    return {
+                      'product_id': item.productId,
+                      'quantity': item.quantity,
+                    };
+                  }).toList();
+
+                  final order = await ApiService.createOrder(
+                    restaurantId: restaurantId,
+                    items: items,
+                    delivery: 1990,
+                  );
+
+                  print('PEDIDO CREADO');
+                  print('ID: ${order['id']}');
+                  print('SUBTOTAL: ${order['subtotal']}');
+                  print('DELIVERY: ${order['delivery']}');
+                  print('TOTAL: ${order['total']}');
+
+                  CartService.clear();
+
+                  if (!context.mounted) return;
+
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TrackingScreen(order: order),
+                    ),
+                  );
+                } catch (e) {
+                  print('ERROR AL CREAR PEDIDO: $e');
+
+                  if (!context.mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('No se pudo crear el pedido: $e')),
+                  );
+                }
+              },
               style: FilledButton.styleFrom(
                 backgroundColor: orange,
                 foregroundColor: Colors.white,
@@ -1082,10 +1216,27 @@ class _InfoTile extends StatelessWidget {
 }
 
 class TrackingScreen extends StatelessWidget {
-  const TrackingScreen({super.key});
+  final Map<String, dynamic> order;
+
+  const TrackingScreen({super.key, required this.order});
 
   @override
   Widget build(BuildContext context) {
+    String statusText(String status) {
+      switch (status) {
+        case 'pending':
+          return 'Pendiente';
+        case 'preparing':
+          return 'Preparando';
+        case 'on_the_way':
+          return 'En camino';
+        case 'delivered':
+          return 'Entregado';
+        default:
+          return status;
+      }
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rastrea tu pedido'),
@@ -1101,25 +1252,31 @@ class TrackingScreen extends StatelessWidget {
               color: const Color(0xFFEAF4EA),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Column(
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.delivery_dining, size: 80, color: green),
                 SizedBox(height: 8),
                 Text(
-                  'Tu pedido va en camino 🚴',
-                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
+                  'Pedido #${order['id']}',
+                  style: const TextStyle(
+                    fontSize: 21,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 SizedBox(height: 5),
                 Text(
-                  'Llegada estimada: 20–30 min',
-                  style: TextStyle(color: green, fontWeight: FontWeight.w700),
+                  'Estado: ${statusText(order['status'])}',
+                  style: const TextStyle(
+                    color: green,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 20),
-          const _StatusTimeline(),
+          _StatusTimeline(status: order['status']),
           const SizedBox(height: 20),
           Container(
             height: 220,
@@ -1144,7 +1301,9 @@ class TrackingScreen extends StatelessWidget {
 }
 
 class _StatusTimeline extends StatelessWidget {
-  const _StatusTimeline();
+  final String status;
+
+  const _StatusTimeline({required this.status});
 
   @override
   Widget build(BuildContext context) {
@@ -1155,10 +1314,21 @@ class _StatusTimeline extends StatelessWidget {
       ('Entregado', Icons.home),
     ];
 
+    final statusIndex =
+        {
+          'pending': 0,
+          'preparing': 1,
+          'on_the_way': 2,
+          'delivered': 3,
+        }[status] ??
+        0;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: items.map((item) {
-        final active = item.$1 != 'Entregado';
+        final itemIndex = items.indexOf(item);
+        final active = itemIndex <= statusIndex;
+
         return Expanded(
           child: Column(
             children: [
@@ -1303,19 +1473,137 @@ class ExploreScreen extends StatelessWidget {
   }
 }
 
-class OrdersScreen extends StatelessWidget {
+class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
 
   @override
+  State<OrdersScreen> createState() => _OrdersScreenState();
+}
+
+class _OrdersScreenState extends State<OrdersScreen> {
+  late Future<List<dynamic>> orders;
+
+  @override
+  void initState() {
+    super.initState();
+    orders = ApiService.getOrders();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Text(
-            'Mis pedidos',
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
-          ),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Mis pedidos',
+          style: TextStyle(fontWeight: FontWeight.w800),
         ),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+      ),
+      body: FutureBuilder<List<dynamic>>(
+        future: orders,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  'Error al obtener pedidos:\n${snapshot.error}',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
+
+          final data = snapshot.data ?? [];
+
+          if (data.isEmpty) {
+            return const Center(
+              child: Text(
+                'No tienes pedidos todavía',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: data.length,
+            itemBuilder: (context, index) {
+              final order = data[index];
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(18),
+                decoration: _cardDecoration(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pedido #${order['id']}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    Text(
+                      order['restaurant_name'] ?? 'Restaurante',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    ...((order['items'] ?? []) as List).map((item) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 5),
+                        child: Text(
+                          '${item['quantity']} × ${item['product_name']}',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      );
+                    }),
+
+                    const SizedBox(height: 8),
+
+                    Text(
+                      'Estado: ${order['status']}',
+                      style: const TextStyle(
+                        color: orange,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+
+                    const Divider(height: 20),
+
+                    Text('Subtotal: \$${order['subtotal']}'),
+
+                    Text('Despacho: \$${order['delivery']}'),
+
+                    const SizedBox(height: 4),
+
+                    Text(
+                      'Total: \$${order['total']}',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }

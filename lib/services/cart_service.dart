@@ -5,6 +5,8 @@ class CartService {
 
   static List<CartItem> get items => _items;
 
+  static int? restaurantId;
+
   static void addItem({
     required int productId,
     required String name,
@@ -70,4 +72,6 @@ class CartService {
   static void clear() {
     _items.clear();
   }
+
+
 }
