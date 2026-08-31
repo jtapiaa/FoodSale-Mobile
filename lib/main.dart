@@ -129,11 +129,19 @@ class _HomeScreenState extends State<HomeScreen> {
   String searchQuery = '';
   List<dynamic> searchResults = [];
   String? selectedCategory;
+  int cartItemCount = 0;
 
   @override
   void initState() {
     super.initState();
     restaurants = ApiService.getRestaurants();
+    cartItemCount = CartService.itemCount;
+  }
+
+  void _updateCartCount() {
+    setState(() {
+      cartItemCount = CartService.itemCount;
+    });
   }
 
   @override
@@ -181,14 +189,45 @@ class _HomeScreenState extends State<HomeScreen> {
                     onPressed: () {},
                     icon: const Icon(Icons.notifications_none_rounded),
                   ),
-                  IconButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const CartScreen()),
-                      );
-                    },
-                    icon: const Icon(Icons.shopping_cart_outlined),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const CartScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.shopping_cart_outlined),
+                      ),
+
+                      if (cartItemCount > 0)
+                        Positioned(
+                          right: 6,
+                          top: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: orange,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '$cartItemCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
@@ -260,6 +299,14 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _SectionTitle(
                 title: 'Restaurantes destacados',
                 action: 'Ver todos',
+                onActionTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const RestaurantsScreen(),
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -410,24 +457,32 @@ class _HomeScreenState extends State<HomeScreen> {
                                   restaurant['delivery_time']?.toString() ?? '',
                               category:
                                   restaurant['category']?.toString() ?? '',
-                              icon: Icons.lunch_dining,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => RestaurantScreen(
-                                    restaurantId: restaurant['id'],
-                                    restaurantName: restaurant['name'],
-                                    rating: restaurant['rating'].toString(),
-                                    deliveryTime:
-                                        restaurant['delivery_time']
-                                            ?.toString() ??
-                                        '',
-                                    category:
-                                        restaurant['category']?.toString() ??
-                                        '',
-                                  ),
-                                ),
+                              icon: getRestaurantIcon(
+                                restaurant['category']?.toString() ?? '',
                               ),
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => RestaurantScreen(
+                                      restaurantId: restaurant['id'],
+                                      restaurantName: restaurant['name'],
+                                      rating: restaurant['rating'].toString(),
+                                      deliveryTime:
+                                          restaurant['delivery_time']
+                                              ?.toString() ??
+                                          '',
+                                      category:
+                                          restaurant['category']?.toString() ??
+                                          '',
+                                    ),
+                                  ),
+                                );
+
+                                if (!mounted) return;
+
+                                _updateCartCount();
+                              },
                             ),
                           );
                         }),
@@ -618,7 +673,13 @@ class _PromoCard extends StatelessWidget {
 class _SectionTitle extends StatelessWidget {
   final String title;
   final String action;
-  const _SectionTitle({required this.title, required this.action});
+  final VoidCallback? onActionTap;
+
+  const _SectionTitle({
+    required this.title,
+    required this.action,
+    this.onActionTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -630,9 +691,13 @@ class _SectionTitle extends StatelessWidget {
             style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
           ),
         ),
-        Text(
-          action,
-          style: const TextStyle(color: orange, fontWeight: FontWeight.w700),
+
+        GestureDetector(
+          onTap: onActionTap,
+          child: Text(
+            action,
+            style: const TextStyle(color: orange, fontWeight: FontWeight.w700),
+          ),
         ),
       ],
     );
@@ -912,6 +977,105 @@ class _RestaurantCardState extends State<RestaurantCard> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class RestaurantsScreen extends StatefulWidget {
+  const RestaurantsScreen({super.key});
+
+  @override
+  State<RestaurantsScreen> createState() => _RestaurantsScreenState();
+}
+
+class _RestaurantsScreenState extends State<RestaurantsScreen> {
+  late Future<List<dynamic>> restaurants;
+
+  @override
+  void initState() {
+    super.initState();
+    restaurants = ApiService.getRestaurants();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Todos los restaurantes',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+      ),
+      body: FutureBuilder<List<dynamic>>(
+        future: restaurants,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  'Error al obtener restaurantes:\n${snapshot.error}',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
+
+          final data = snapshot.data ?? [];
+
+          if (data.isEmpty) {
+            return const Center(
+              child: Text(
+                'No hay restaurantes disponibles',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: data.length,
+            itemBuilder: (context, index) {
+              final restaurant = data[index];
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: RestaurantCard(
+                  restaurantId: restaurant['id'],
+                  name: restaurant['name']?.toString() ?? '',
+                  rating: restaurant['rating']?.toString() ?? '0.0',
+                  time: restaurant['delivery_time']?.toString() ?? '',
+                  category: restaurant['category']?.toString() ?? '',
+                  icon: getRestaurantIcon(
+                    restaurant['category']?.toString() ?? '',
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RestaurantScreen(
+                          restaurantId: restaurant['id'],
+                          restaurantName: restaurant['name']?.toString() ?? '',
+                          rating: restaurant['rating']?.toString() ?? '0.0',
+                          deliveryTime:
+                              restaurant['delivery_time']?.toString() ?? '',
+                          category: restaurant['category']?.toString() ?? '',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -2578,6 +2742,38 @@ BoxDecoration _cardDecoration() {
   );
 }
 
+// FUNCIONES AUXILIARES
+
 String formatPrice(int value) {
   return '\$${value.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => '.')}';
+}
+
+IconData getRestaurantIcon(String category) {
+  final value = category.toLowerCase();
+
+  if (value.contains('hamburgues')) {
+    return Icons.lunch_dining;
+  }
+
+  if (value.contains('pizza')) {
+    return Icons.local_pizza;
+  }
+
+  if (value.contains('saludable')) {
+    return Icons.eco;
+  }
+
+  if (value.contains('bebida')) {
+    return Icons.local_drink;
+  }
+
+  if (value.contains('postre')) {
+    return Icons.cake;
+  }
+
+  if (value.contains('picoteo')) {
+    return Icons.restaurant;
+  }
+
+  return Icons.restaurant;
 }
