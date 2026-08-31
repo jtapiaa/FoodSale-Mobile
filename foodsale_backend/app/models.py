@@ -92,7 +92,7 @@ class Order(db.Model):
     total = db.Column(db.Integer, nullable=False)
 
     status = db.Column(db.String(50), nullable=False, default="pending")
-
+    delivery_address = db.Column(db.String(255), nullable=False, default="")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     items = db.relationship(

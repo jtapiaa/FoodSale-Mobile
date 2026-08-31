@@ -5,10 +5,12 @@ import 'models/cart_item.dart';
 import 'services/api_service.dart';
 import 'services/cart_service.dart';
 import 'services/favorite_service.dart';
+import 'services/address_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await FavoriteService.load();
+  await AddressService.load();
   runApp(const FoodSaleApp());
 }
 
@@ -1087,6 +1089,12 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     final items = CartService.items;
     final subtotal = CartService.subtotal;
@@ -1122,8 +1130,11 @@ class _CartScreenState extends State<CartScreen> {
           : ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                _AddressCard(),
-
+                _AddressCard(
+                  onChanged: () {
+                    setState(() {});
+                  },
+                ),
                 const SizedBox(height: 18),
 
                 ...items.map(
@@ -1194,19 +1205,39 @@ class _CartScreenState extends State<CartScreen> {
 }
 
 class _AddressCard extends StatelessWidget {
+  final VoidCallback onChanged;
+
+  const _AddressCard({required this.onChanged});
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _cardDecoration(),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.location_on, color: orange),
-          SizedBox(width: 10),
-          Expanded(child: Text('Av. Primero de Mayo 1234, La Calera')),
-          Text(
-            'Cambiar',
-            style: TextStyle(color: orange, fontWeight: FontWeight.w700),
+          const Icon(Icons.location_on, color: orange),
+          const SizedBox(width: 10),
+
+          Expanded(
+            child: Text(
+              AddressService.address,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+
+          TextButton(
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AddressScreen()),
+              );
+
+              onChanged();
+            },
+            child: const Text(
+              'Cambiar',
+              style: TextStyle(color: orange, fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
@@ -1321,10 +1352,7 @@ class PaymentScreen extends StatelessWidget {
             style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 10),
-          _InfoTile(
-            icon: Icons.location_on,
-            text: 'Av. Primero de Mayo 1234, La Calera',
-          ),
+          _InfoTile(icon: Icons.location_on, text: AddressService.address),
           const SizedBox(height: 22),
           const Text(
             'Método de pago',
@@ -1372,6 +1400,7 @@ class PaymentScreen extends StatelessWidget {
                   final order = await ApiService.createOrder(
                     restaurantId: restaurantId,
                     items: items,
+                    deliveryAddress: AddressService.address,
                     delivery: 1990,
                   );
 
@@ -1380,6 +1409,7 @@ class PaymentScreen extends StatelessWidget {
                   print('SUBTOTAL: ${order['subtotal']}');
                   print('DELIVERY: ${order['delivery']}');
                   print('TOTAL: ${order['total']}');
+                  print('DIRECCIÓN: ${order['delivery_address']}');
 
                   CartService.clear();
 
@@ -1467,6 +1497,13 @@ class OrderDetailScreen extends StatelessWidget {
           Text(
             order['restaurant_name'] ?? 'Restaurante',
             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+          ),
+
+          const SizedBox(height: 12),
+
+          _InfoTile(
+            icon: Icons.location_on,
+            text: order['delivery_address'] ?? 'Dirección no disponible',
           ),
 
           const SizedBox(height: 20),
@@ -1582,6 +1619,28 @@ class TrackingScreen extends StatelessWidget {
           const SizedBox(height: 20),
           _StatusTimeline(status: order['status']),
           const SizedBox(height: 20),
+
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _StatusButton(
+                text: 'Preparando',
+                status: 'preparing',
+                orderId: order['id'],
+              ),
+              _StatusButton(
+                text: 'En camino',
+                status: 'on_the_way',
+                orderId: order['id'],
+              ),
+              _StatusButton(
+                text: 'Entregado',
+                status: 'delivered',
+                orderId: order['id'],
+              ),
+            ],
+          ),
           Container(
             height: 220,
             decoration: BoxDecoration(
@@ -1597,9 +1656,53 @@ class TrackingScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+
+          _InfoTile(
+            icon: Icons.location_on,
+            text: order['delivery_address'] ?? 'Dirección no disponible',
+          ),
+
+          const SizedBox(height: 12),
+
           _InfoTile(icon: Icons.person, text: 'Repartidor aún no asignado'),
         ],
       ),
+    );
+  }
+}
+
+class _StatusButton extends StatelessWidget {
+  final String text;
+  final String status;
+  final int orderId;
+
+  const _StatusButton({
+    required this.text,
+    required this.status,
+    required this.orderId,
+  });
+
+  Future<void> _updateStatus(BuildContext context) async {
+    try {
+      await ApiService.updateOrderStatus(orderId: orderId, status: status);
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Pedido actualizado: $text')));
+    } catch (e) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton(
+      onPressed: () => _updateStatus(context),
+      child: Text(text),
     );
   }
 }
@@ -1707,9 +1810,15 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           const _ProfileOption(icon: Icons.receipt_long, text: 'Mis pedidos'),
-          const _ProfileOption(
+          _ProfileOption(
             icon: Icons.location_on,
             text: 'Direcciones guardadas',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AddressScreen()),
+              );
+            },
           ),
           const _ProfileOption(
             icon: Icons.credit_card,
@@ -1733,26 +1842,128 @@ class ProfileScreen extends StatelessWidget {
 class _ProfileOption extends StatelessWidget {
   final IconData icon;
   final String text;
+  final VoidCallback? onTap;
 
-  const _ProfileOption({required this.icon, required this.text});
+  const _ProfileOption({required this.icon, required this.text, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
-      decoration: _cardDecoration(),
-      child: Row(
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+        decoration: _cardDecoration(),
+        child: Row(
+          children: [
+            Icon(icon, color: dark),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AddressScreen extends StatefulWidget {
+  const AddressScreen({super.key});
+
+  @override
+  State<AddressScreen> createState() => _AddressScreenState();
+}
+
+class _AddressScreenState extends State<AddressScreen> {
+  late TextEditingController controller;
+
+  @override
+  void initState() {
+    super.initState();
+
+    controller = TextEditingController(text: AddressService.address);
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> saveAddress() async {
+    final address = controller.text.trim();
+
+    if (address.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Ingresa una dirección')));
+      return;
+    }
+
+    await AddressService.save(address);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Dirección guardada')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Direcciones guardadas',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
         children: [
-          Icon(icon, color: dark),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+          const Text(
+            'Dirección de entrega',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          ),
+
+          const SizedBox(height: 12),
+
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            decoration: _cardDecoration(),
+            child: TextField(
+              controller: controller,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                icon: Icon(Icons.location_on, color: orange),
+                hintText: 'Ingresa tu dirección',
+              ),
             ),
           ),
-          const Icon(Icons.chevron_right, color: Colors.grey),
+
+          const SizedBox(height: 20),
+
+          SizedBox(
+            height: 54,
+            child: FilledButton(
+              onPressed: saveAddress,
+              style: FilledButton.styleFrom(
+                backgroundColor: orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text(
+                'Guardar dirección',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
         ],
       ),
     );

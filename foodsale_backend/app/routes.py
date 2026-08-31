@@ -103,6 +103,7 @@ def create_order():
     items = data["items"]
 
     delivery = data.get("delivery", 1990)
+    delivery_address = data.get("delivery_address", "")
 
     subtotal = 0
 
@@ -112,6 +113,7 @@ def create_order():
         delivery=delivery,
         total=0,
         status="pending",
+        delivery_address=delivery_address,
     )
 
     db.session.add(order)
@@ -147,6 +149,7 @@ def create_order():
                 "delivery": order.delivery,
                 "total": order.total,
                 "status": order.status,
+                "delivery_address": order.delivery_address,
                 "items": [
                     {
                         "product_id": item.product_id,
@@ -179,6 +182,7 @@ def get_orders():
                 "delivery": order.delivery,
                 "total": order.total,
                 "status": order.status,
+                "delivery_address": order.delivery_address,
                 "created_at": order.created_at.isoformat(),
                 "items": [
                     {
@@ -197,6 +201,54 @@ def get_orders():
         )
 
     return jsonify(result)
+
+
+@main.route("/api/orders/<int:order_id>/status", methods=["PATCH"])
+def update_order_status(order_id):
+    from app import db
+
+    order = Order.query.get(order_id)
+
+    if not order:
+        return jsonify({"error": "Pedido no encontrado"}), 404
+
+    data = request.get_json()
+
+    new_status = data.get("status")
+
+    valid_statuses = [
+        "pending",
+        "preparing",
+        "on_the_way",
+        "delivered",
+    ]
+
+    if new_status not in valid_statuses:
+        return (
+            jsonify(
+                {
+                    "error": "Estado inválido",
+                    "valid_statuses": valid_statuses,
+                }
+            ),
+            400,
+        )
+
+    order.status = new_status
+
+    db.session.commit()
+
+    return (
+        jsonify(
+            {
+                "id": order.id,
+                "restaurant_id": order.restaurant_id,
+                "status": order.status,
+                "delivery_address": order.delivery_address,
+            }
+        ),
+        200,
+    )
 
 
 @main.route("/api/search", methods=["GET"])

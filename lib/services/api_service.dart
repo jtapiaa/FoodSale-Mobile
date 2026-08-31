@@ -37,6 +37,7 @@ class ApiService {
   static Future<Map<String, dynamic>> createOrder({
     required int restaurantId,
     required List<Map<String, dynamic>> items,
+    required String deliveryAddress,
     int delivery = 1990,
   }) async {
     final response = await http.post(
@@ -46,6 +47,7 @@ class ApiService {
         'restaurant_id': restaurantId,
         'items': items,
         'delivery': delivery,
+        'delivery_address': deliveryAddress,
       }),
     );
 
@@ -88,5 +90,25 @@ class ApiService {
     }
 
     throw Exception('Error al buscar: ${response.statusCode}');
+  }
+
+  static Future<Map<String, dynamic>> updateOrderStatus({
+    required int orderId,
+    required String status,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/orders/$orderId/status'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'status': status}),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+
+    throw Exception(
+      'Error al actualizar estado: '
+      '${response.statusCode} ${response.body}',
+    );
   }
 }
