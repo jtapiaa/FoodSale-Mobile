@@ -1257,13 +1257,13 @@ class _CartScreenState extends State<CartScreen> {
                     children: [
                       SummaryRow(
                         label: 'Pedido',
-                        value: '\$${CartService.subtotal}',
+                        value: formatPrice(CartService.subtotal),
                       ),
-                      const SummaryRow(label: 'Despacho', value: '\$1990'),
+                      SummaryRow(label: 'Despacho', value: formatPrice(1990)),
                       const Divider(height: 24),
                       SummaryRow(
                         label: 'Total',
-                        value: '\$${CartService.subtotal + 1990}',
+                        value: formatPrice(CartService.subtotal + 1990),
                         bold: true,
                       ),
                     ],
@@ -1466,12 +1466,15 @@ class PaymentScreen extends StatelessWidget {
             decoration: _cardDecoration(),
             child: Column(
               children: [
-                SummaryRow(label: 'Pedido', value: '\$${CartService.subtotal}'),
-                const SummaryRow(label: 'Despacho', value: '\$1.990'),
+                SummaryRow(
+                  label: 'Pedido',
+                  value: formatPrice(CartService.subtotal),
+                ),
+                SummaryRow(label: 'Despacho', value: formatPrice(1990)),
                 const Divider(height: 24),
                 SummaryRow(
                   label: 'Total',
-                  value: '\$${CartService.subtotal + 1990}',
+                  value: formatPrice(CartService.subtotal + 1990),
                   bold: true,
                 ),
               ],
@@ -1625,7 +1628,7 @@ class OrderDetailScreen extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '\$${item['price'] * item['quantity']}',
+                    formatPrice(item['price'] * item['quantity']),
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ],
@@ -1635,13 +1638,14 @@ class OrderDetailScreen extends StatelessWidget {
 
           const Divider(height: 30),
 
-          Text('Subtotal: \$${order['subtotal']}'),
-          Text('Despacho: \$${order['delivery']}'),
+          Text('Subtotal: ${formatPrice(order['subtotal'])}'),
+
+          Text('Despacho: ${formatPrice(order['delivery'])}'),
 
           const SizedBox(height: 6),
 
           Text(
-            'Total: \$${order['total']}',
+            'Total: ${formatPrice(order['total'])}',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
           ),
 
@@ -2365,14 +2369,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
                         const Divider(height: 20),
 
-                        Text('Subtotal: \$${order['subtotal']}'),
+                        Text('Subtotal: ${formatPrice(order['subtotal'])}'),
 
-                        Text('Despacho: \$${order['delivery']}'),
+                        Text('Despacho: ${formatPrice(order['delivery'])}'),
 
                         const SizedBox(height: 4),
 
                         Text(
-                          'Total: \$${order['total']}',
+                          'Total: ${formatPrice(order['total'])}',
                           style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w900,
@@ -2528,4 +2532,8 @@ BoxDecoration _cardDecoration() {
       ),
     ],
   );
+}
+
+String formatPrice(int value) {
+  return '\$${value.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => '.')}';
 }
