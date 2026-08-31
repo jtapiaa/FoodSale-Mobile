@@ -450,6 +450,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: RestaurantCard(
+                              available: restaurant['available'] ?? true,
                               restaurantId: restaurant['id'],
                               name: restaurant['name']?.toString() ?? '',
                               rating: restaurant['rating']?.toString() ?? '0.0',
@@ -840,6 +841,7 @@ class RestaurantCard extends StatefulWidget {
   final String category;
   final IconData icon;
   final VoidCallback onTap;
+  final bool available;
 
   const RestaurantCard({
     super.key,
@@ -850,6 +852,7 @@ class RestaurantCard extends StatefulWidget {
     required this.category,
     required this.icon,
     required this.onTap,
+    required this.available,
   });
 
   @override
@@ -879,7 +882,7 @@ class _RestaurantCardState extends State<RestaurantCard> {
   Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(20),
-      onTap: widget.onTap,
+      onTap: widget.available ? widget.onTap : null,
       child: Container(
         decoration: _cardDecoration(),
         clipBehavior: Clip.antiAlias,
@@ -930,7 +933,28 @@ class _RestaurantCardState extends State<RestaurantCard> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Colors.grey),
                     ),
+                    const SizedBox(height: 10),
 
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: widget.available
+                            ? const Color(0xFFFFF0C7)
+                            : const Color(0xFFEAEAEA),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        widget.available ? 'Disponible' : 'No disponible',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: widget.available ? orange : Colors.grey,
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 10),
 
                     Container(
@@ -942,9 +966,9 @@ class _RestaurantCardState extends State<RestaurantCard> {
                         color: const Color(0xFFFFF0C7),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Text(
-                        'Envío gratis',
-                        style: TextStyle(
+                      child: Text(
+                        'Despacho ${formatPrice(1990)}',
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),
@@ -1056,6 +1080,7 @@ class _RestaurantsScreenState extends State<RestaurantsScreen> {
                   icon: getRestaurantIcon(
                     restaurant['category']?.toString() ?? '',
                   ),
+                  available: restaurant['available'] ?? false,
                   onTap: () {
                     Navigator.push(
                       context,
@@ -2699,6 +2724,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       rating: restaurant['rating']?.toString() ?? '0.0',
                       time: restaurant['delivery_time']?.toString() ?? '',
                       category: restaurant['category']?.toString() ?? '',
+                      available: restaurant['available'] ?? true,
                       icon: Icons.lunch_dining,
                       onTap: () {
                         Navigator.push(
