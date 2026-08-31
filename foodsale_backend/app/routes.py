@@ -203,6 +203,43 @@ def get_orders():
     return jsonify(result)
 
 
+@main.route("/api/orders/<int:order_id>", methods=["GET"])
+def get_order(order_id):
+    order = Order.query.get(order_id)
+
+    if not order:
+        return jsonify({"error": "Pedido no encontrado"}), 404
+
+    restaurant = Restaurant.query.get(order.restaurant_id)
+
+    return jsonify(
+        {
+            "id": order.id,
+            "restaurant_id": order.restaurant_id,
+            "restaurant_name": (restaurant.name if restaurant else "Restaurante"),
+            "subtotal": order.subtotal,
+            "delivery": order.delivery,
+            "total": order.total,
+            "status": order.status,
+            "delivery_address": order.delivery_address,
+            "created_at": order.created_at.isoformat(),
+            "items": [
+                {
+                    "product_id": item.product_id,
+                    "product_name": (
+                        Product.query.get(item.product_id).name
+                        if Product.query.get(item.product_id)
+                        else "Producto"
+                    ),
+                    "quantity": item.quantity,
+                    "price": item.price,
+                }
+                for item in order.items
+            ],
+        }
+    )
+
+
 @main.route("/api/orders/<int:order_id>/status", methods=["PATCH"])
 def update_order_status(order_id):
     from app import db

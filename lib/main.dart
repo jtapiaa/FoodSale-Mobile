@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'dart:async';
+
 import 'models/cart_item.dart';
 
 import 'services/api_service.dart';
@@ -1571,10 +1573,60 @@ class OrderDetailScreen extends StatelessWidget {
   }
 }
 
-class TrackingScreen extends StatelessWidget {
+class TrackingScreen extends StatefulWidget {
   final Map<String, dynamic> order;
 
   const TrackingScreen({super.key, required this.order});
+
+  @override
+  State<TrackingScreen> createState() => _TrackingScreenState();
+}
+
+class _TrackingScreenState extends State<TrackingScreen> {
+  late String status;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+
+    status = widget.order['status']?.toString() ?? 'pending';
+
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _refreshOrder());
+  }
+
+  Future<void> _refreshOrder() async {
+    print('REFRESCANDO PEDIDO ${widget.order['id']}');
+
+    try {
+      final updatedOrder = await ApiService.getOrder(widget.order['id']);
+
+      print('PEDIDO ACTUALIZADO: $updatedOrder');
+
+      if (!mounted) return;
+
+      final newStatus = updatedOrder['status']?.toString() ?? 'pending';
+
+      print('ESTADO ACTUAL: $status');
+      print('ESTADO NUEVO: $newStatus');
+
+      if (newStatus != status) {
+        setState(() {
+          status = newStatus;
+        });
+
+        print('ESTADO CAMBIADO A: $newStatus');
+      }
+    } catch (e) {
+      print('ERROR ACTUALIZANDO PEDIDO: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1597,17 +1649,17 @@ class TrackingScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.delivery_dining, size: 80, color: green),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
-                  'Pedido #${order['id']}',
+                  'Pedido #${widget.order['id']}',
                   style: const TextStyle(
                     fontSize: 21,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                SizedBox(height: 5),
+                const SizedBox(height: 5),
                 Text(
-                  'Estado: ${getOrderStatusText(order['status'])}',
+                  'Estado: ${getOrderStatusText(status)}',
                   style: const TextStyle(
                     color: green,
                     fontWeight: FontWeight.w700,
@@ -1616,31 +1668,13 @@ class TrackingScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          _StatusTimeline(status: order['status']),
+
           const SizedBox(height: 20),
 
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _StatusButton(
-                text: 'Preparando',
-                status: 'preparing',
-                orderId: order['id'],
-              ),
-              _StatusButton(
-                text: 'En camino',
-                status: 'on_the_way',
-                orderId: order['id'],
-              ),
-              _StatusButton(
-                text: 'Entregado',
-                status: 'delivered',
-                orderId: order['id'],
-              ),
-            ],
-          ),
+          _StatusTimeline(status: status),
+
+          const SizedBox(height: 20),
+
           Container(
             height: 220,
             decoration: BoxDecoration(
@@ -1655,54 +1689,22 @@ class TrackingScreen extends StatelessWidget {
               ),
             ),
           ),
+
           const SizedBox(height: 16),
 
           _InfoTile(
             icon: Icons.location_on,
-            text: order['delivery_address'] ?? 'Dirección no disponible',
+            text: widget.order['delivery_address'] ?? 'Dirección no disponible',
           ),
 
           const SizedBox(height: 12),
 
-          _InfoTile(icon: Icons.person, text: 'Repartidor aún no asignado'),
+          const _InfoTile(
+            icon: Icons.person,
+            text: 'Repartidor aún no asignado',
+          ),
         ],
       ),
-    );
-  }
-}
-
-class _StatusButton extends StatelessWidget {
-  final String text;
-  final String status;
-  final int orderId;
-
-  const _StatusButton({
-    required this.text,
-    required this.status,
-    required this.orderId,
-  });
-
-  Future<void> _updateStatus(BuildContext context) async {
-    try {
-      await ApiService.updateOrderStatus(orderId: orderId, status: status);
-
-      if (!context.mounted) return;
-
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Pedido actualizado: $text')));
-    } catch (e) {
-      if (!context.mounted) return;
-
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FilledButton(
-      onPressed: () => _updateStatus(context),
-      child: Text(text),
     );
   }
 }
@@ -1996,12 +1998,61 @@ class OrdersScreen extends StatefulWidget {
 }
 
 class _OrdersScreenState extends State<OrdersScreen> {
-  late Future<List<dynamic>> orders;
+  List<dynamic> orders = [];
+  Timer? _timer;
+  bool loading = true;
 
   @override
   void initState() {
     super.initState();
-    orders = ApiService.getOrders();
+
+    _loadOrders();
+
+    _timer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _refreshOrders(),
+    );
+  }
+
+  Future<void> _loadOrders() async {
+    try {
+      final data = await ApiService.getOrders();
+
+      if (!mounted) return;
+
+      setState(() {
+        orders = data;
+        loading = false;
+      });
+    } catch (e) {
+      debugPrint('Error cargando pedidos: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        loading = false;
+      });
+    }
+  }
+
+  Future<void> _refreshOrders() async {
+    try {
+      final updatedOrders = await ApiService.getOrders();
+
+      if (!mounted) return;
+
+      setState(() {
+        orders = updatedOrders;
+      });
+    } catch (e) {
+      debugPrint('Error actualizando pedidos: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -2015,122 +2066,99 @@ class _OrdersScreenState extends State<OrdersScreen> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
       ),
-      body: FutureBuilder<List<dynamic>>(
-        future: orders,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text(
-                  'Error al obtener pedidos:\n${snapshot.error}',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }
-
-          final data = snapshot.data ?? [];
-
-          if (data.isEmpty) {
-            return const Center(
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : orders.isEmpty
+          ? const Center(
               child: Text(
                 'No tienes pedidos todavía',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
-            );
-          }
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(20),
+              itemCount: orders.length,
+              itemBuilder: (context, index) {
+                final order = orders[index];
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(20),
-            itemCount: data.length,
-            itemBuilder: (context, index) {
-              final order = data[index];
-
-              return InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => OrderDetailScreen(order: order),
-                    ),
-                  );
-                },
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 14),
-                  padding: const EdgeInsets.all(18),
-                  decoration: _cardDecoration(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Pedido #${order['id']}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
+                return InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => OrderDetailScreen(order: order),
                       ),
-
-                      const SizedBox(height: 6),
-
-                      Text(
-                        order['restaurant_name'] ?? 'Restaurante',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      ...((order['items'] ?? []) as List).map((item) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 5),
-                          child: Text(
-                            '${item['quantity']} × ${item['product_name']}',
-                            style: const TextStyle(fontSize: 14),
+                    );
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.all(18),
+                    decoration: _cardDecoration(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Pedido #${order['id']}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
                           ),
-                        );
-                      }),
-
-                      const SizedBox(height: 8),
-
-                      Text(
-                        'Estado: ${getOrderStatusText(order['status'])}',
-                        style: const TextStyle(
-                          color: orange,
-                          fontWeight: FontWeight.w700,
                         ),
-                      ),
 
-                      const Divider(height: 20),
+                        const SizedBox(height: 6),
 
-                      Text('Subtotal: \$${order['subtotal']}'),
-
-                      Text('Despacho: \$${order['delivery']}'),
-
-                      const SizedBox(height: 4),
-
-                      Text(
-                        'Total: \$${order['total']}',
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
+                        Text(
+                          order['restaurant_name'] ?? 'Restaurante',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                    ],
+
+                        const SizedBox(height: 12),
+
+                        ...((order['items'] ?? []) as List).map((item) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 5),
+                            child: Text(
+                              '${item['quantity']} × ${item['product_name']}',
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          );
+                        }),
+
+                        const SizedBox(height: 8),
+
+                        Text(
+                          'Estado: ${getOrderStatusText(order['status'])}',
+                          style: const TextStyle(
+                            color: orange,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+
+                        const Divider(height: 20),
+
+                        Text('Subtotal: \$${order['subtotal']}'),
+
+                        Text('Despacho: \$${order['delivery']}'),
+
+                        const SizedBox(height: 4),
+
+                        Text(
+                          'Total: \$${order['total']}',
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-          );
-        },
-      ),
+                );
+              },
+            ),
     );
   }
 }
