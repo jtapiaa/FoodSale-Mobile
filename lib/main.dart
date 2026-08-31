@@ -278,11 +278,17 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _SectionTitle(
                 title: 'Categorías',
                 action: 'Ver todas',
-                onActionTap: () {
-                  Navigator.push(
+                onActionTap: () async {
+                  final category = await Navigator.push<String>(
                     context,
                     MaterialPageRoute(builder: (_) => const CategoriesScreen()),
                   );
+
+                  if (category == null || !mounted) return;
+
+                  setState(() {
+                    selectedCategory = category;
+                  });
                 },
               ),
             ),
@@ -299,11 +305,17 @@ class _HomeScreenState extends State<HomeScreen> {
                         : category;
                   });
                 },
-                onViewAll: () {
-                  Navigator.push(
+                onViewAll: () async {
+                  final category = await Navigator.push<String>(
                     context,
-                    MaterialPageRoute(builder: (_) => CategoriesScreen()),
+                    MaterialPageRoute(builder: (_) => const CategoriesScreen()),
                   );
+
+                  if (category == null || !mounted) return;
+
+                  setState(() {
+                    selectedCategory = category;
+                  });
                 },
               ),
             ),
@@ -358,6 +370,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   final category =
                       restaurant['category']?.toString().toLowerCase() ?? '';
+
+                  debugPrint(
+                    'Restaurante: ${restaurant['name']} | '
+                    'Categoría: ${restaurant['category']} | '
+                    'Seleccionada: $selectedCategory',
+                  );
 
                   final matchesSearch =
                       name.contains(searchQuery.toLowerCase()) ||
@@ -1108,6 +1126,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               return InkWell(
                 borderRadius: BorderRadius.circular(20),
                 onTap: () {
+                  debugPrint('CATEGORIA ELEGIDA: $name');
                   Navigator.pop(context, name);
                 },
                 child: Container(
