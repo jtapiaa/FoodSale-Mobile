@@ -580,7 +580,7 @@ class _PromoCard extends StatelessWidget {
             width: 145,
             height: 145,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(.55),
+              color: Colors.white.withValues(alpha: .55),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -685,7 +685,7 @@ class _CategoriesState extends State<_Categories> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
             itemBuilder: (_, i) {
               final category = items[i];
               final name = category['name']?.toString() ?? '';
@@ -1371,12 +1371,16 @@ class PaymentScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(18),
             decoration: _cardDecoration(),
-            child: const Column(
+            child: Column(
               children: [
-                SummaryRow(label: 'Pedido', value: '\$10.960'),
-                SummaryRow(label: 'Despacho', value: '\$1.990'),
-                Divider(height: 24),
-                SummaryRow(label: 'Total', value: '\$12.950', bold: true),
+                SummaryRow(label: 'Pedido', value: '\$${CartService.subtotal}'),
+                const SummaryRow(label: 'Despacho', value: '\$1.990'),
+                const Divider(height: 24),
+                SummaryRow(
+                  label: 'Total',
+                  value: '\$${CartService.subtotal + 1990}',
+                  bold: true,
+                ),
               ],
             ),
           ),
@@ -1420,7 +1424,7 @@ class PaymentScreen extends StatelessWidget {
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => TrackingScreen(order: order),
+                      builder: (_) => OrderConfirmationScreen(order: order),
                     ),
                   );
                 } catch (e) {
@@ -1573,6 +1577,143 @@ class OrderDetailScreen extends StatelessWidget {
   }
 }
 
+class OrderConfirmationScreen extends StatelessWidget {
+  final Map<String, dynamic> order;
+
+  const OrderConfirmationScreen({super.key, required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Pedido confirmado'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          const SizedBox(height: 30),
+
+          Icon(Icons.check_circle, size: 90, color: green),
+
+          const SizedBox(height: 20),
+
+          const Text(
+            '¡Pedido confirmado!',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+          ),
+
+          const SizedBox(height: 8),
+
+          Text(
+            'Tu pedido #${order['id']} fue creado correctamente.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 16, color: Colors.grey),
+          ),
+
+          const SizedBox(height: 30),
+
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: _cardDecoration(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  order['restaurant_name'] ?? 'Restaurante',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_on),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        order['delivery_address'] ?? 'Dirección no disponible',
+                        style: const TextStyle(fontSize: 15),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const Divider(height: 30),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Total',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      '\$${order['total']}',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 30),
+
+          SizedBox(
+            height: 54,
+            child: FilledButton(
+              onPressed: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TrackingScreen(order: order),
+                  ),
+                );
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text(
+                'Ver seguimiento',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          SizedBox(
+            height: 54,
+            child: OutlinedButton(
+              onPressed: () {
+                Navigator.popUntil(context, (route) => route.isFirst);
+              },
+              child: const Text(
+                'Volver al inicio',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class TrackingScreen extends StatefulWidget {
   final Map<String, dynamic> order;
 
@@ -1596,26 +1737,17 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
 
   Future<void> _refreshOrder() async {
-    print('REFRESCANDO PEDIDO ${widget.order['id']}');
-
     try {
       final updatedOrder = await ApiService.getOrder(widget.order['id']);
-
-      print('PEDIDO ACTUALIZADO: $updatedOrder');
 
       if (!mounted) return;
 
       final newStatus = updatedOrder['status']?.toString() ?? 'pending';
 
-      print('ESTADO ACTUAL: $status');
-      print('ESTADO NUEVO: $newStatus');
-
       if (newStatus != status) {
         setState(() {
           status = newStatus;
         });
-
-        print('ESTADO CAMBIADO A: $newStatus');
       }
     } catch (e) {
       print('ERROR ACTUALIZANDO PEDIDO: $e');
@@ -2297,7 +2429,7 @@ BoxDecoration _cardDecoration() {
     borderRadius: BorderRadius.circular(20),
     boxShadow: [
       BoxShadow(
-        color: Colors.black.withOpacity(.05),
+        color: Colors.black.withValues(alpha: .05),
         blurRadius: 14,
         offset: const Offset(0, 5),
       ),
