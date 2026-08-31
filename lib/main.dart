@@ -1102,7 +1102,49 @@ class MenuItem extends StatelessWidget {
             ),
           ),
           IconButton(
-            onPressed: () {
+            onPressed: () async {
+              final currentRestaurantId = CartService.restaurantId;
+
+              if (CartService.items.isNotEmpty &&
+                  currentRestaurantId != null &&
+                  currentRestaurantId != restaurantId) {
+                final shouldReplace = await showDialog<bool>(
+                  context: context,
+                  builder: (context) {
+                    return AlertDialog(
+                      title: const Text('Carrito de otro restaurante'),
+                      content: const Text(
+                        'Tu carrito contiene productos de otro restaurante. '
+                        '¿Quieres vaciarlo y agregar este producto?',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context, false);
+                          },
+                          child: const Text('Cancelar'),
+                        ),
+                        FilledButton(
+                          onPressed: () {
+                            Navigator.pop(context, true);
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: orange,
+                          ),
+                          child: const Text('Vaciar y agregar'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+
+                if (shouldReplace != true) {
+                  return;
+                }
+
+                CartService.clear();
+              }
+
               CartService.restaurantId = restaurantId;
 
               CartService.addItem(
