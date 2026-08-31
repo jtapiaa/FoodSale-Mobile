@@ -903,6 +903,10 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
     products = ApiService.getRestaurantProducts(widget.restaurantId);
   }
 
+  void _refreshCart() {
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -913,6 +917,47 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
         ),
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
+        actions: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.shopping_cart_outlined),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CartScreen()),
+                  );
+                },
+              ),
+
+              if (CartService.itemCount > 0)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: orange,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${CartService.itemCount}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
@@ -988,6 +1033,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
                     description: product['description'] ?? '',
                     price: product['price'],
                     restaurantId: widget.restaurantId,
+                    onCartChanged: _refreshCart,
                   );
                 }).toList(),
               );
@@ -1005,6 +1051,7 @@ class MenuItem extends StatelessWidget {
   final String description;
   final int price;
   final int restaurantId;
+  final VoidCallback? onCartChanged;
 
   const MenuItem({
     super.key,
@@ -1013,6 +1060,7 @@ class MenuItem extends StatelessWidget {
     required this.description,
     required this.price,
     required this.restaurantId,
+    this.onCartChanged,
   });
 
   @override
@@ -1056,11 +1104,14 @@ class MenuItem extends StatelessWidget {
           IconButton(
             onPressed: () {
               CartService.restaurantId = restaurantId;
+
               CartService.addItem(
                 productId: productId,
                 name: name,
                 price: price,
               );
+
+              onCartChanged?.call();
 
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
