@@ -128,6 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late Future<List<dynamic>> restaurants;
   String searchQuery = '';
   List<dynamic> searchResults = [];
+  String? selectedCategory;
 
   @override
   void initState() {
@@ -240,7 +241,18 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            sliver: SliverToBoxAdapter(child: _Categories()),
+            sliver: SliverToBoxAdapter(
+              child: _Categories(
+                selectedCategory: selectedCategory,
+                onCategorySelected: (category) {
+                  setState(() {
+                    selectedCategory = selectedCategory == category
+                        ? null
+                        : category;
+                  });
+                },
+              ),
+            ),
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
@@ -281,11 +293,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 final filteredData = data.where((restaurant) {
                   final name =
                       restaurant['name']?.toString().toLowerCase() ?? '';
+
                   final category =
                       restaurant['category']?.toString().toLowerCase() ?? '';
 
-                  return name.contains(searchQuery.toLowerCase()) ||
+                  final matchesSearch =
+                      name.contains(searchQuery.toLowerCase()) ||
                       category.contains(searchQuery.toLowerCase());
+
+                  final matchesCategory =
+                      selectedCategory == null ||
+                      category.contains(selectedCategory!.toLowerCase());
+
+                  return matchesSearch && matchesCategory;
                 }).toList();
 
                 final isSearching = searchQuery.trim().isNotEmpty;
@@ -620,7 +640,13 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _Categories extends StatefulWidget {
-  const _Categories();
+  final String? selectedCategory;
+  final ValueChanged<String?> onCategorySelected;
+
+  const _Categories({
+    required this.selectedCategory,
+    required this.onCategorySelected,
+  });
 
   @override
   State<_Categories> createState() => _CategoriesState();
@@ -686,33 +712,51 @@ class _CategoriesState extends State<_Categories> {
             scrollDirection: Axis.horizontal,
             itemCount: items.length,
             separatorBuilder: (_, _) => const SizedBox(width: 12),
+
             itemBuilder: (_, i) {
               final category = items[i];
               final name = category['name']?.toString() ?? '';
 
               return SizedBox(
                 width: 82,
-                child: Column(
-                  children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: _cardDecoration(),
-                      child: Icon(
-                        getCategoryIcon(name),
-                        color: i == 0 ? orange : dark,
-                        size: 30,
+                child: GestureDetector(
+                  onTap: () {
+                    widget.onCategorySelected(name);
+                  },
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: widget.selectedCategory == name
+                              ? const Color(0xFFFFF0C7)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: widget.selectedCategory == name
+                                ? orange
+                                : Colors.transparent,
+                          ),
+                        ),
+                        child: Icon(
+                          getCategoryIcon(name),
+                          color: widget.selectedCategory == name
+                              ? orange
+                              : dark,
+                          size: 30,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 7),
-                    Text(
-                      name,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ],
+                      const SizedBox(height: 7),
+                      Text(
+                        name,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
