@@ -275,7 +275,16 @@ class _HomeScreenState extends State<HomeScreen> {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
             sliver: SliverToBoxAdapter(
-              child: _SectionTitle(title: 'Categorías', action: 'Ver todas'),
+              child: _SectionTitle(
+                title: 'Categorías',
+                action: 'Ver todas',
+                onActionTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CategoriesScreen()),
+                  );
+                },
+              ),
             ),
           ),
           SliverPadding(
@@ -289,6 +298,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? null
                         : category;
                   });
+                },
+                onViewAll: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => CategoriesScreen()),
+                  );
                 },
               ),
             ),
@@ -708,10 +723,12 @@ class _SectionTitle extends StatelessWidget {
 class _Categories extends StatefulWidget {
   final String? selectedCategory;
   final ValueChanged<String?> onCategorySelected;
+  final VoidCallback onViewAll;
 
   const _Categories({
     required this.selectedCategory,
     required this.onCategorySelected,
+    required this.onViewAll,
   });
 
   @override
@@ -739,6 +756,8 @@ class _CategoriesState extends State<_Categories> {
         return Icons.local_drink;
       case 'postres':
         return Icons.cake;
+      case 'picoteo':
+        return Icons.restaurant;
       default:
         return Icons.restaurant;
     }
@@ -778,10 +797,11 @@ class _CategoriesState extends State<_Categories> {
             scrollDirection: Axis.horizontal,
             itemCount: items.length,
             separatorBuilder: (_, _) => const SizedBox(width: 12),
-
             itemBuilder: (_, i) {
               final category = items[i];
               final name = category['name']?.toString() ?? '';
+
+              final selected = widget.selectedCategory == name;
 
               return SizedBox(
                 width: 82,
@@ -795,25 +815,23 @@ class _CategoriesState extends State<_Categories> {
                         width: 72,
                         height: 72,
                         decoration: BoxDecoration(
-                          color: widget.selectedCategory == name
+                          color: selected
                               ? const Color(0xFFFFF0C7)
                               : Colors.white,
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(
-                            color: widget.selectedCategory == name
-                                ? orange
-                                : Colors.transparent,
+                            color: selected ? orange : Colors.transparent,
                           ),
                         ),
                         child: Icon(
                           getCategoryIcon(name),
-                          color: widget.selectedCategory == name
-                              ? orange
-                              : dark,
+                          color: selected ? orange : dark,
                           size: 30,
                         ),
                       ),
+
                       const SizedBox(height: 7),
+
                       Text(
                         name,
                         textAlign: TextAlign.center,
@@ -1001,6 +1019,119 @@ class _RestaurantCardState extends State<RestaurantCard> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class CategoriesScreen extends StatefulWidget {
+  const CategoriesScreen({super.key});
+
+  @override
+  State<CategoriesScreen> createState() => _CategoriesScreenState();
+}
+
+class _CategoriesScreenState extends State<CategoriesScreen> {
+  late Future<List<dynamic>> categories;
+
+  @override
+  void initState() {
+    super.initState();
+    categories = ApiService.getCategories();
+  }
+
+  IconData getCategoryIcon(String name) {
+    switch (name.toLowerCase()) {
+      case 'hamburguesas':
+        return Icons.lunch_dining;
+      case 'pizzas':
+        return Icons.local_pizza;
+      case 'saludable':
+        return Icons.eco;
+      case 'bebidas':
+        return Icons.local_drink;
+      case 'postres':
+        return Icons.cake;
+      case 'picoteo':
+        return Icons.restaurant;
+      default:
+        return Icons.restaurant;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Todas las categorías',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+      ),
+      body: FutureBuilder<List<dynamic>>(
+        future: categories,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                'Error al cargar categorías:\n${snapshot.error}',
+                textAlign: TextAlign.center,
+              ),
+            );
+          }
+
+          final items = snapshot.data ?? [];
+
+          if (items.isEmpty) {
+            return const Center(child: Text('No hay categorías disponibles'));
+          }
+
+          return GridView.builder(
+            padding: const EdgeInsets.all(20),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 14,
+              childAspectRatio: 1.15,
+            ),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final category = items[index];
+              final name = category['name']?.toString() ?? '';
+
+              return InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  Navigator.pop(context, name);
+                },
+                child: Container(
+                  decoration: _cardDecoration(),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(getCategoryIcon(name), color: orange, size: 42),
+                      const SizedBox(height: 10),
+                      Text(
+                        name,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -1328,7 +1459,7 @@ class MenuItem extends StatelessWidget {
                 ),
                 const SizedBox(height: 7),
                 Text(
-                  '\$$price',
+                  formatPrice(price),
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
               ],
