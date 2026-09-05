@@ -9,6 +9,7 @@ import 'services/cart_service.dart';
 import 'services/favorite_service.dart';
 import 'services/address_service.dart';
 import 'screens/login_screen.dart';
+import 'services/session_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,11 +18,41 @@ Future<void> main() async {
   runApp(const FoodSaleApp());
 }
 
-class FoodSaleApp extends StatelessWidget {
+class FoodSaleApp extends StatefulWidget {
   const FoodSaleApp({super.key});
 
   @override
+  State<FoodSaleApp> createState() => _FoodSaleAppState();
+}
+
+class _FoodSaleAppState extends State<FoodSaleApp> {
+  bool? isLoggedIn;
+
+  @override
+  void initState() {
+    super.initState();
+    checkSession();
+  }
+
+  Future<void> checkSession() async {
+    final loggedIn = await SessionService.isLoggedIn();
+
+    if (!mounted) return;
+
+    setState(() {
+      isLoggedIn = loggedIn;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (isLoggedIn == null) {
+      return const MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(body: Center(child: CircularProgressIndicator())),
+      );
+    }
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'FoodSale',
@@ -34,7 +65,7 @@ class FoodSaleApp extends StatelessWidget {
           primary: const Color(0xFFFFB000),
         ),
       ),
-      home: const LoginScreen(),
+      home: isLoggedIn! ? const MainNavigation() : const LoginScreen(),
       routes: {'/home': (_) => const MainNavigation()},
     );
   }

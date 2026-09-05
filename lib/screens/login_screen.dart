@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../services/session_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -28,7 +29,10 @@ class _LoginScreenState extends State<LoginScreen> {
         password: passwordController.text,
       );
 
+      await SessionService.saveUser(Map<String, dynamic>.from(result['user']));
+
       debugPrint('LOGIN CORRECTO: ${result['user']}');
+
       if (!mounted) return;
 
       Navigator.pushReplacementNamed(context, '/home');
