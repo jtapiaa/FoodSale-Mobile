@@ -2413,8 +2413,31 @@ class _StatusTimeline extends StatelessWidget {
   }
 }
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  Map<String, dynamic>? user;
+
+  @override
+  void initState() {
+    super.initState();
+    loadUser();
+  }
+
+  Future<void> loadUser() async {
+    final data = await SessionService.getUser();
+
+    if (!mounted) return;
+
+    setState(() {
+      user = data;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2424,61 +2447,87 @@ class ProfileScreen extends StatelessWidget {
         children: [
           const Text(
             'Mi perfil',
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 18),
+
           Container(
             padding: const EdgeInsets.all(18),
             decoration: _cardDecoration(),
-            child: const Row(
+            child: Row(
               children: [
-                CircleAvatar(
+                const CircleAvatar(
                   radius: 32,
                   backgroundColor: Color(0xFFFFF0C7),
-                  child: Icon(Icons.person, color: orange, size: 34),
+                  child: Icon(
+                    Icons.person,
+                    color: orange,
+                    size: 34,
+                  ),
                 ),
-                SizedBox(width: 14),
+                const SizedBox(width: 14),
+
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Juan Pérez',
-                      style: TextStyle(
+                      user?['name'] ?? 'Usuario',
+                      style: const TextStyle(
                         fontSize: 19,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
-                      'juan.perez@email.com',
-                      style: TextStyle(color: Colors.grey),
+                      user?['email'] ?? '',
+                      style: const TextStyle(
+                        color: Colors.grey,
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
           ),
+
           const SizedBox(height: 18),
-          const _ProfileOption(icon: Icons.receipt_long, text: 'Mis pedidos'),
+
+          const _ProfileOption(
+            icon: Icons.receipt_long,
+            text: 'Mis pedidos',
+          ),
+
           _ProfileOption(
             icon: Icons.location_on,
             text: 'Direcciones guardadas',
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const AddressScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const AddressScreen(),
+                ),
               );
             },
           ),
+
           const _ProfileOption(
             icon: Icons.credit_card,
             text: 'Métodos de pago',
           ),
-          const _ProfileOption(icon: Icons.favorite, text: 'Favoritos'),
+
+          const _ProfileOption(
+            icon: Icons.favorite,
+            text: 'Favoritos',
+          ),
+
           const _ProfileOption(
             icon: Icons.local_offer_outlined,
             text: 'Cupones y ofertas',
           ),
+
           const _ProfileOption(
             icon: Icons.help_outline,
             text: 'Ayuda y soporte',
