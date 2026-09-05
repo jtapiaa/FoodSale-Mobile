@@ -66,7 +66,10 @@ class _FoodSaleAppState extends State<FoodSaleApp> {
         ),
       ),
       home: isLoggedIn! ? const MainNavigation() : const LoginScreen(),
-      routes: {'/home': (_) => const MainNavigation()},
+      routes: {
+        '/home': (_) => const MainNavigation(),
+        '/login': (_) => const LoginScreen(),
+      },
     );
   }
 }
@@ -2479,6 +2482,24 @@ class ProfileScreen extends StatelessWidget {
           const _ProfileOption(
             icon: Icons.help_outline,
             text: 'Ayuda y soporte',
+          ),
+
+          const SizedBox(height: 18),
+
+          _ProfileOption(
+            icon: Icons.logout,
+            text: 'Cerrar sesión',
+            onTap: () async {
+              await SessionService.logout();
+
+              if (!context.mounted) return;
+
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/login',
+                (route) => false,
+              );
+            },
           ),
         ],
       ),
