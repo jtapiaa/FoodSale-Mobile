@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from app.models import Product, Restaurant, Category, Order, OrderItem
+from app.models import Product, Restaurant, Category, Order, OrderItem, User
 
 main = Blueprint("main", __name__)
 
@@ -321,3 +321,81 @@ def search():
         )
 
     return jsonify(result)
+
+
+@main.route("/api/register", methods=["POST"])
+def register():
+    from app import db
+
+    data = request.get_json()
+
+    name = data.get("name", "").strip()
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+
+    if not name or not email or not password:
+        return (
+            jsonify({"error": "Nombre, email y contraseña son obligatorios"}),
+            400,
+        )
+
+    existing_user = User.query.filter_by(email=email).first()
+
+    if existing_user:
+        return (
+            jsonify({"error": "El email ya está registrado"}),
+            409,
+        )
+
+    user = User(
+        name=name,
+        email=email,
+    )
+
+    user.set_password(password)
+
+    db.session.add(user)
+    db.session.commit()
+
+    return (
+        jsonify(
+            {
+                "message": "Usuario registrado correctamente",
+                "user": user.to_dict(),
+            }
+        ),
+        201,
+    )
+
+
+@main.route("/api/login", methods=["POST"])
+def login():
+    data = request.get_json()
+
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+
+    if not email or not password:
+        return (
+            jsonify({"error": "Email y contraseña son obligatorios"}),
+            400,
+        )
+
+    user = User.query.filter_by(email=email).first()
+
+    if not user or not user.check_password(password):
+        return (
+            jsonify({"error": "Credenciales incorrectas"}),
+            401,
+        )
+
+    return (
+        jsonify(
+            {
+                "message": "Login correcto",
+                "user": user.to_dict(),
+            }
+        ),
+        200,
+    )
+

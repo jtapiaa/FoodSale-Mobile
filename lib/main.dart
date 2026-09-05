@@ -8,6 +8,7 @@ import 'services/api_service.dart';
 import 'services/cart_service.dart';
 import 'services/favorite_service.dart';
 import 'services/address_service.dart';
+import 'screens/login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,7 +34,8 @@ class FoodSaleApp extends StatelessWidget {
           primary: const Color(0xFFFFB000),
         ),
       ),
-      home: const MainNavigation(),
+      home: const LoginScreen(),
+      routes: {'/home': (_) => const MainNavigation()},
     );
   }
 }
